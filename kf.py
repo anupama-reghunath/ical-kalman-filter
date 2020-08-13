@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt #for plotting
 import pandas as pd      #for data frame creation
 import sympy as sym      #for symbolic calculations
 #import scipy as sp
-import sys
-sys.stdout = open('file.txt', 'w') #printing output onto file.txt
+#import sys
+#sys.stdout = open('file.txt', 'w') #printing output onto file.txt
 #***************************************************************
 #to find the f(l) for q/p error prediction by fitting data from muon-iron-energyLossTable
 
@@ -33,7 +33,7 @@ fl_3=CubicSpline.derivative(fl,nu=3)    #using it to obtain the differential f''
 
 #***************************************************************
 #Reading measured data
-df=pd.read_csv("mp10.txt",sep="\t")
+df=pd.read_csv("dataGeV/mp20.txt",sep="\t")
 df1=np.array(df)
 
 xm=-1*df1[:,4]
@@ -365,16 +365,10 @@ def Kalman(i,temp_stv):
     
     temp_stv=np.array(temp_stv)
     global covp
-    
-    #Alternate Kalman definitions
-    #covp=np.linalg.inv(np.array( covp+ ((Hk.T)@Gk@Hk) ))
-    #Kf=covp@(Hk.T)@Gk
-    
-    
-    
+      
     #Kalman Gain matrix
     Kf=covp@(Hk.T)@(np.linalg.inv(np.array((Hk@covp@(Hk.T)+Vk),dtype=float)))
-    #print(Kf[0][0],Kf[0][1],'\n',Kf[1][0],Kf[1][1],'\n',Kf[2][0],Kf[2][1],'\n',Kf[3][0],Kf[3][1],'\n',Kf[4][0],Kf[4][1])
+  
     #Kalman estimate for state vector       
     temp_stv=(temp_stv.T+Kf@(mk[i,:].T-Hk@(temp_stv.T))).T
     
@@ -395,24 +389,25 @@ def vector_updation(i,temp,z):
     zpp.append(-z)
     
 #***************************************************************
+#Defining the Random Error Matrix
 
-def CMS_I():
-    p=q/qbp
-    dl=dz*sym.sqrt(1+tx**2+ty**2)
-    Z=26.0
-    ls=17.57*((Z+1)/Z)*(289*Z**(-1/2))/(159*Z**(-1/3))
-    return (0.015/(beta()*p))**2*(dl/ls)
+#def CMS_I():
+#    p=q/qbp
+#    dl=dz*sym.sqrt(1+tx**2+ty**2)
+#    Z=26.0
+#    ls=17.57*((Z+1)/Z)*(289*Z**(-1/2))/(159*Z**(-1/3))
+#    return (0.015/(beta()*p))**2*(dl/ls)
 
-def cov_txtx():
-    return (1+tx**2)*(1+tx**2+ty**2)*CMS_I()
-def cov_tyty():
-    return (1+ty**2)*(1+tx**2+ty**2)*CMS_I()
-def cov_txty():
-    return tx*ty*(1+tx**2+ty**2)*CMS_I()
+#def cov_txtx():
+#    return (1+tx**2)*(1+tx**2+ty**2)*CMS_I()
+#def cov_tyty():
+#    return (1+ty**2)*(1+tx**2+ty**2)*CMS_I()
+#def cov_txty():
+#    return tx*ty*(1+tx**2+ty**2)*CMS_I()
 
-c_txtx = sym.lambdify((tx,ty,qbp,dz), cov_txtx(), "numpy")    
-c_tyty = sym.lambdify((tx,ty,qbp,dz), cov_tyty(), "numpy")    
-c_txty = sym.lambdify((tx,ty,qbp,dz), cov_txty(), "numpy")    
+#c_txtx = sym.lambdify((tx,ty,qbp,dz), cov_txtx(), "numpy")    
+#c_tyty = sym.lambdify((tx,ty,qbp,dz), cov_tyty(), "numpy")    
+#c_txty = sym.lambdify((tx,ty,qbp,dz), cov_txty(), "numpy")    
     
 
 #Q_l =[[None for j in range (5)] for i in range (5)]
@@ -507,7 +502,7 @@ for iterations in range(1): # controls the number of iterations;
         for j in range(58):    #Subloop for each combo            
                        
             if (j==0 or j==57):
-                dz_e=-20         #in mm for air gap between rpc and iron      
+                dz_e=-20            #in mm for air gap between rpc and iron      
                 material="Air"
             else:
                 dz_e=-1             #in mm for iron plate
@@ -525,7 +520,7 @@ for iterations in range(1): # controls the number of iterations;
             if (material=="Iron"):
                 dEds=EnergylossIron(i,qbp_e)
             else:
-                dEds=0.0 #EnergylossAir(i,qbp_e)         #Assuming no energy loss in air       
+                dEds=0.0 #EnergylossAir(i,qbp_e)          #Assuming no energy loss in air       
         
             E_cal = E[-1]-(dEds*dl*10**-4)                #Updating Energy
             E.append(E_cal)
@@ -534,7 +529,7 @@ for iterations in range(1): # controls the number of iterations;
             Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)   #Updating propagator matrix
             Covariance()                                  #Updating the Covariance matrix
     
-            ze = ze + dz_e        #updating z
+            ze = ze + dz_e                                #Updating z
             temp_stv=x_e,y_e,tx_e,ty_e,qbp_e    
     
             #printing the propagator matrix for each j   
@@ -542,7 +537,6 @@ for iterations in range(1): # controls the number of iterations;
                     
             #printing the covariance matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'\t',covp[0][0],covp[0][1],covp[0][2],covp[0][3],covp[0][4],'\n','\t',covp[1][0],covp[1][1],covp[1][2],covp[1][3],covp[1][4],'\n','\t',covp[2][0],covp[2][1],covp[2][2],covp[2][3],covp[2][4],'\n','\t',covp[3][0],covp[3][1],covp[3][2],covp[3][3],covp[3][4],'\n','\t',covp[4][0],covp[4][1],covp[4][2],covp[4][3],covp[4][4],'\n')            
-        #print("Kalman loop, i=",i)    
         temp_stv=Kalman(i,temp_stv) #Kalman filtering 
  
         print(i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],E_cal)
