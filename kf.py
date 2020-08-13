@@ -33,7 +33,7 @@ fl_3=CubicSpline.derivative(fl,nu=3)    #using it to obtain the differential f''
 
 #***************************************************************
 #Reading measured data
-df=pd.read_csv("mp20.txt",sep="\t")
+df=pd.read_csv("mp10.txt",sep="\t")
 df1=np.array(df)
 
 xm=-1*df1[:,4]
@@ -63,7 +63,8 @@ by=0
 
 #***************************************************************
 #Initialisation of values
-E_inc=100.0                       #Initial value of Incident Energy
+E_inc=50.0                       #Initial value of Incident Energy
+#E_inc=100.0                       #Initial value of Incident Energy
 #z0 = zm[0]  
 #z1 = zm[1]
 
@@ -77,7 +78,7 @@ stv[1][0]=-df1[1,4]
 stv[1][1]=-df1[1,6]
 stv[0][2]=(stv[1][0]-stv[0][0])/(zm[1]-zm[0]) #tx_0 =(x1-x0)/(z1-z0)
 stv[0][3]=(stv[1][1]-stv[0][1])/(zm[1]-zm[0]) #ty_0 =(y1-y0)/(z1-z0)
-stv[0][4]=q/np.sqrt(E_inc**2-m**2)           #Initial value of Momentum in GeV/c
+stv[0][4]=0.0#q/np.sqrt(E_inc**2-m**2)           #Initial value of Momentum in GeV/c
 
 #***************************************************************
 #Defining the Prediction equations
@@ -360,7 +361,7 @@ def Covariance():
 
 ide=np.identity(5,dtype=float)
 #Gk=np.linalg.inv(Vk)
-def Kalman(i,temp_stv,z):   
+def Kalman(i,temp_stv):   
     
     temp_stv=np.array(temp_stv)
     global covp
@@ -395,35 +396,91 @@ def vector_updation(i,temp,z):
     
 #***************************************************************
 
+def CMS_I():
+    p=q/qbp
+    dl=dz*sym.sqrt(1+tx**2+ty**2)
+    Z=26.0
+    ls=17.57*((Z+1)/Z)*(289*Z**(-1/2))/(159*Z**(-1/3))
+    return (0.015/(beta()*p))**2*(dl/ls)
 
+def cov_txtx():
+    return (1+tx**2)*(1+tx**2+ty**2)*CMS_I()
+def cov_tyty():
+    return (1+ty**2)*(1+tx**2+ty**2)*CMS_I()
+def cov_txty():
+    return tx*ty*(1+tx**2+ty**2)*CMS_I()
+
+c_txtx = sym.lambdify((tx,ty,qbp,dz), cov_txtx(), "numpy")    
+c_tyty = sym.lambdify((tx,ty,qbp,dz), cov_tyty(), "numpy")    
+c_txty = sym.lambdify((tx,ty,qbp,dz), cov_txty(), "numpy")    
+    
+
+#Q_l =[[None for j in range (5)] for i in range (5)]
+#Q_l=np.array(Q_l,dtype=float)
+
+
+#def Scattering(txe,tye,qbpe,dze,l,D): #l is dz*np.sqrt(1+tx**2+ty**2)
+      
+        
+    #Q_l[0][0]= c_txtx(txe,tye,qbpe,dze)*(l**3)/3
+    #Q_l[0][1]= c_txty(txe,tye,qbpe,dze)*(l**3)/3
+    #Q_l[0][2]= c_txtx(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[0][3]= c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[0][4]=
+    
+    #Q_l[1][0]=c_txty(txe,tye,qbpe,dze)*(l**3)/3
+    #Q_l[1][1]=c_tyty(txe,tye,qbpe,dze)*(l**3)/3
+    #Q_l[1][2]=c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[1][3]=c_tyty(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[1][4]=
+
+    #Q_l[2][0]=c_txtx(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[2][1]=c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[2][2]=c_txtx(txe,tye,qbpe,dze)*l
+    #Q_l[2][3]=c_txty(txe,tye,qbpe,dze)*l
+    #Q_l[2][4]=
+    
+    #Q_l[3][0]=c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[3][1]=c_tyty(txe,tye,qbpe,dze)*(l**2)*D/2
+    #Q_l[3][2]=c_txtx(txe,tye,qbpe,dze)*l
+    #Q_l[3][3]=c_tyty(txe,tye,qbpe,dze)*l
+    #Q_l[3][4]=
+
+    #Q_l[4][0]=
+    #Q_l[4][1]=
+    #Q_l[4][2]=
+    #Q_l[4][3]=
+    #Q_l[4][4]=
+
+#***************************************************************
 
 def Plots():
     
     #X coordinates
 
-    #plt.plot(-zm,xm)
-    #plt.plot(zpp,xpp) 
+    plt.plot(-zm,xm)
+    plt.plot(zpp,xpp) 
     #plt.scatter(-zm,xm)
     #plt.scatter(zpp,xpp) 
 
-    #plt.legend(("Simulated x",'Predicted x' ))
-    #plt.xlabel('y - values') 
-    #plt.ylabel('x - values') 
-    #plt.title('Prediction vs Simulation for x coordinates (20 GeV)') 
+    plt.legend(("Simulated x",'Predicted x' ))
+    plt.xlabel('y - values') 
+    plt.ylabel('x - values') 
+    plt.title('Prediction vs Simulation for x coordinates (20 GeV)') 
     
     #**************************
     
     #Z coordinates
     
-    plt.plot(-zm,ym)
-    plt.plot(zpp,ypp)   
+    #plt.plot(-zm,ym)
+    #plt.plot(zpp,ypp)   
     #plt.scatter(zm,ym)
     #plt.scatter(zpp,ypp)
  
-    plt.legend(("Simulated z",'Predicted z' ))
-    plt.xlabel('y - values') 
-    plt.ylabel('z - values') 
-    plt.title('Prediction vs Simulation for z coordinates (20 GeV)') 
+    #plt.legend(("Simulated z",'Predicted z' ))
+    #plt.xlabel('y - values') 
+    #plt.ylabel('z - values') 
+    #plt.title('Prediction vs Simulation for z coordinates (20 GeV)') 
     
     #plt.grid(b=None, which='major', axis='both')
     plt.show() 
@@ -444,7 +501,7 @@ for iterations in range(1): # controls the number of iterations;
     temp_stv=np.array(temp_stv)
     for i in range(len(df1)):  #Main loop for 150 (air+iron+air) combo
 
-        #vector_updation(i,temp_stv,ze)      #saves the state vector
+        vector_updation(i,temp_stv,ze)      #saves the state vector
         x_e,y_e,tx_e,ty_e,qbp_e=temp_stv
         
         for j in range(58):    #Subloop for each combo            
@@ -464,9 +521,7 @@ for iterations in range(1): # controls the number of iterations;
             
             dl =-dz_e*np.sqrt(1+tx_e**2+ty_e**2)          #differential arc length
         
-            Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)   #Updating propagator matrix
-            Covariance()                                  #Updating the Covariance matrix
-    
+            
             if (material=="Iron"):
                 dEds=EnergylossIron(i,qbp_e)
             else:
@@ -476,20 +531,21 @@ for iterations in range(1): # controls the number of iterations;
             E.append(E_cal)
             qbp_e = q/np.sqrt(E_cal**2-m**2)              #Updating q/p    
             
+            Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)   #Updating propagator matrix
+            Covariance()                                  #Updating the Covariance matrix
+    
             ze = ze + dz_e        #updating z
             temp_stv=x_e,y_e,tx_e,ty_e,qbp_e    
     
-            #printing the propagator matrix for each i   
+            #printing the propagator matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'propf \t',prop_f[0][0],prop_f[0][1],prop_f[0][2],prop_f[0][3],prop_f[0][4],'\n','\t',prop_f[1][0],prop_f[1][1],prop_f[1][2],prop_f[1][3],prop_f[1][4],'\n','\t',prop_f[2][0],prop_f[2][1],prop_f[2][2],prop_f[2][3],prop_f[2][4],'\n','\t',prop_f[3][0],prop_f[3][1],prop_f[3][2],prop_f[3][3],prop_f[3][4],'\n','\t',prop_f[4][0],prop_f[4][1],prop_f[4][2],prop_f[4][3],prop_f[4][4],'\n')        
                     
-            #printing the covariance matrix for each i   
+            #printing the covariance matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'\t',covp[0][0],covp[0][1],covp[0][2],covp[0][3],covp[0][4],'\n','\t',covp[1][0],covp[1][1],covp[1][2],covp[1][3],covp[1][4],'\n','\t',covp[2][0],covp[2][1],covp[2][2],covp[2][3],covp[2][4],'\n','\t',covp[3][0],covp[3][1],covp[3][2],covp[3][3],covp[3][4],'\n','\t',covp[4][0],covp[4][1],covp[4][2],covp[4][3],covp[4][4],'\n')            
         #print("Kalman loop, i=",i)    
-        temp_stv=Kalman(i,temp_stv,ze) #Kalman filtering 
+        temp_stv=Kalman(i,temp_stv) #Kalman filtering 
  
-        if (temp_stv[4]<0):         #if q/p is negative
-            temp_stv[4]=0.00303     #set as initial value
         print(i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],E_cal)
        
 #print(E_cal) #print the final energy value
-#Plots()
+Plots()
