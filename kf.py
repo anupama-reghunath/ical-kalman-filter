@@ -1,20 +1,18 @@
-""" Assignment 7 :
-    Defining the error propagation using the covariance matrix and propagator matrix
-    Kalman Filter Equations implemented
-    """
+""" A python based implementation of a kalman filter 
+    Author: Anupama Reghunath    """
 import numpy as np       #for mathematical calculations
 import matplotlib.pyplot as plt #for plotting
 import pandas as pd      #for data frame creation
 import sympy as sym      #for symbolic calculations
 #import scipy as sp
 #import sys
-#sys.stdout = open('file.txt', 'w') #printing output onto file.txt
+#sys.stdout = open('output.txt', 'w') #printing output onto file.txt
+
 #***************************************************************
 #to find the f(l) for q/p error prediction by fitting data from muon-iron-energyLossTable
 
 from scipy.interpolate import CubicSpline 
 
-#cb=pd.read_csv("muon-iron-energyLossTable3.txt",sep=" ") 
 cb=pd.read_csv("muon-iron-energyLossTable3.txt",sep=" ")
 cb1=np.array(cb)
 
@@ -145,37 +143,6 @@ def BetheBlochIron():
      dEds= rho*0.307075/((beta())**2)*ZbA*( 0.5*sym.log(2*me*(beta()*gamma())**2*T()/(I**2))-(beta())**2)#-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g
      return dEds
 
-def BetheBlochAir():
-     rho=1.205*10**-3
-     ZbA=0.49919   #Z/A
-     I=85.7*10**-9 #in GeV  
-     def T():
-         return 2*me*(beta()*gamma())**2/( 1 + 2*(me/m)*sym.sqrt(1+(beta()*gamma())**2+(me/m)**2) ) # Max Kinetic Eenrgy   
-              
-     dEds= rho*0.307075/((beta())**2)*ZbA*( 0.5*sym.log(2*me*(beta()*gamma())**2*T()/(I**2))-(beta())**2)#-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g
-     return dEds
-
-def FermiAir(i,qbpe): #Fermi correction to Bethe Bloche 
-     rho=1.205*10**-3
-     ZbA=0.49919
-     #constants for Fermi correction in Air
-     xd0=1.742
-     xd1=4.28
-     md=3.40
-     a=0.1091
-     C0=-10.6
-
-     xd=f_xd(qbpe)
-     if xd<xd0:
-            delta=0.0
-     if xd>xd0 and xd<xd1:
-            delta=4.6052*xd+C0+(a*((xd1-xd)**md))
-     if xd>xd1:
-            delta=4.6052*xd+C0
-     
-     return rho*0.307075/((f_b(qbpe))**2)*ZbA*delta**0.5
-
-
 def FermiIron(i,qbpe): #Fermi correction to Bethe Bloche 
      
      rho=7.874
@@ -200,9 +167,39 @@ def EnergylossIron(i,qbpe):
     En=f_betheI(qbpe)-FermiIron(i,qbpe)
     return En
 
-def EnergylossAir(i,qbpe):
-    En=f_betheA(qbpe)-FermiAir(i,qbpe)
-    return En
+#def BetheBlochAir():
+#     rho=1.205*10**-3
+#     ZbA=0.49919   #Z/A
+#     I=85.7*10**-9 #in GeV  
+#     def T():
+#         return 2*me*(beta()*gamma())**2/( 1 + 2*(me/m)*sym.sqrt(1+(beta()*gamma())**2+(me/m)**2) ) # Max Kinetic Eenrgy   
+              
+#     dEds= rho*0.307075/((beta())**2)*ZbA*( 0.5*sym.log(2*me*(beta()*gamma())**2*T()/(I**2))-(beta())**2)#-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g
+#     return dEds
+
+#def FermiAir(i,qbpe): #Fermi correction to Bethe Bloche 
+#     rho=1.205*10**-3
+#     ZbA=0.49919
+     #constants for Fermi correction in Air
+#     xd0=1.742
+#     xd1=4.28
+#     md=3.40
+#     a=0.1091
+#     C0=-10.6
+
+#     xd=f_xd(qbpe)
+#     if xd<xd0:
+#            delta=0.0
+#     if xd>xd0 and xd<xd1:
+#            delta=4.6052*xd+C0+(a*((xd1-xd)**md))
+#     if xd>xd1:
+#            delta=4.6052*xd+C0
+     
+#     return rho*0.307075/((f_b(qbpe))**2)*ZbA*delta**0.5
+
+#def EnergylossAir(i,qbpe):
+#    En=f_betheA(qbpe)-FermiAir(i,qbpe)
+#    return En
 
 #Converting symbolic to mathematical
 
@@ -211,7 +208,7 @@ f_y = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_ye(), "numpy")
 f_tx= sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_txe(),"numpy")
 f_ty= sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_tye(),"numpy")
 f_betheI=sym.lambdify((qbp), BetheBlochIron(),"numpy")
-f_betheA=sym.lambdify((qbp), BetheBlochAir(),"numpy")
+#f_betheA=sym.lambdify((qbp), BetheBlochAir(),"numpy")
 
 #***************************************************************
 
@@ -485,9 +482,8 @@ def Plots():
 
 E=[]
 E.append(E_inc)                #initial value of energy
-#temp_stv=stv[0]                #dummy list for current state vector in loop
 zpp,xpp,ypp=[],[],[]           #data saved for plotting
-ze=zm[0]                       #initial value for z
+ze=zm[0]                       #initial value for z for plotting
 
 
 
