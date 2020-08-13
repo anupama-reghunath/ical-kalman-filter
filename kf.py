@@ -6,7 +6,7 @@ import pandas as pd      #for data frame creation
 import sympy as sym      #for symbolic calculations
 #import scipy as sp
 #import sys
-#sys.stdout = open('output.txt', 'w') #printing output onto file.txt
+#sys.stdout = open('output.txt', 'w') #printing output onto output.txt
 
 #***************************************************************
 #to find the f(l) for q/p error prediction by fitting data from muon-iron-energyLossTable
@@ -34,9 +34,9 @@ fl_3=CubicSpline.derivative(fl,nu=3)    #using it to obtain the differential f''
 df=pd.read_csv("dataGeV/mp20.txt",sep="\t")
 df1=np.array(df)
 
-xm=-1*df1[:,4]
+xm=df1[:,4]
 zm=df1[:,5]
-ym=-1*df1[:,6] #interchange of z to y because by convention of the equation, the z is the perpendicular axis.
+ym=df1[:,6] #interchange of z to y because by convention of the equation, the z is the perpendicular axis.
 
 mk =[[ None for i in range(2) ] for j in range(len(df1)) ] #state vector
 mk=np.array(mk)
@@ -70,10 +70,10 @@ stv = [[ None for i in range(5) ] for j in range(len(df1)) ] #state vector
 stv = np.array(stv)
 
 #Defining the initial state vector from measured
-stv[0][0]=-df1[0,4]
-stv[0][1]=-df1[0,6]
-stv[1][0]=-df1[1,4]
-stv[1][1]=-df1[1,6]
+stv[0][0]=df1[0,4]
+stv[0][1]=df1[0,6]
+stv[1][0]=df1[1,4]
+stv[1][1]=df1[1,6]
 stv[0][2]=(stv[1][0]-stv[0][0])/(zm[1]-zm[0]) #tx_0 =(x1-x0)/(z1-z0)
 stv[0][3]=(stv[1][1]-stv[0][1])/(zm[1]-zm[0]) #ty_0 =(y1-y0)/(z1-z0)
 stv[0][4]=0.0#q/np.sqrt(E_inc**2-m**2)           #Initial value of Momentum in GeV/c
@@ -383,7 +383,7 @@ def vector_updation(i,temp,z):
     stv[i][0],stv[i][1],stv[i][2],stv[i][3],stv[i][4]=temp
     xpp.append(stv[i][0])
     ypp.append(stv[i][1])
-    zpp.append(-z)
+    zpp.append(z)
     
 #***************************************************************
 #Defining the Random Error Matrix
@@ -450,9 +450,9 @@ def Plots():
     
     #X coordinates
 
-    plt.plot(-zm,xm)
+    plt.plot(zm,xm)
     plt.plot(zpp,xpp) 
-    #plt.scatter(-zm,xm)
+    #plt.scatter(zm,xm)
     #plt.scatter(zpp,xpp) 
 
     plt.legend(("Simulated x",'Predicted x' ))
@@ -464,7 +464,7 @@ def Plots():
     
     #Z coordinates
     
-    #plt.plot(-zm,ym)
+    #plt.plot(zm,ym)
     #plt.plot(zpp,ypp)   
     #plt.scatter(zm,ym)
     #plt.scatter(zpp,ypp)
@@ -498,10 +498,10 @@ for iterations in range(1): # controls the number of iterations;
         for j in range(58):    #Subloop for each combo            
                        
             if (j==0 or j==57):
-                dz_e=-20            #in mm for air gap between rpc and iron      
+                dz_e=20            #in mm for air gap between rpc and iron      
                 material="Air"
             else:
-                dz_e=-1             #in mm for iron plate
+                dz_e=1             #in mm for iron plate
                 material="Iron"
             
         
@@ -510,7 +510,7 @@ for iterations in range(1): # controls the number of iterations;
             tx_e = f_tx(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)     #Updating tx
             ty_e = f_ty(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)     #Updating ty
             
-            dl =-dz_e*np.sqrt(1+tx_e**2+ty_e**2)          #differential arc length
+            dl =dz_e*np.sqrt(1+tx_e**2+ty_e**2)          #differential arc length
         
             
             if (material=="Iron"):
@@ -525,7 +525,7 @@ for iterations in range(1): # controls the number of iterations;
             Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)   #Updating propagator matrix
             Covariance()                                  #Updating the Covariance matrix
     
-            ze = ze + dz_e                                #Updating z
+            ze = ze - dz_e                                #Updating z
             temp_stv=x_e,y_e,tx_e,ty_e,qbp_e    
     
             #printing the propagator matrix for each j   
