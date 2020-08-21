@@ -1,5 +1,10 @@
 """ A python based implementation of a kalman filter 
     Author: Anupama Reghunath    """
+import time
+
+# starting time
+start = time.time()
+
 import numpy as np       #for mathematical calculations
 import matplotlib.pyplot as plt #for plotting
 import pandas as pd      #for data frame creation
@@ -11,23 +16,23 @@ import sympy as sym      #for symbolic calculations
 #***************************************************************
 #to find the f(l) for q/p error prediction by fitting data from muon-iron-energyLossTable
 
-from scipy.interpolate import CubicSpline 
+#coeffecients of p
+c00,c01,c02,c03,c04,c05=20.31019610992487, 818.1567338049706, -21.382302321528552, 1.379247983139621, -0.04875634389271173, 0.0006735041922117595
+#l as a function of p    
+def range_l():
+    return c00+c01*(q/qbp)+c02*(q/qbp)**2+c03*(q/qbp)**3+c04*(q/qbp)**4+c05*(q/qbp)**5
 
-cb=pd.read_csv("muon-iron-energyLossTable3.txt",sep=" ")
-cb1=np.array(cb)
+c_0,c_1,c_2,c_3,c_4,c_5=-0.00022297311773143545, 0.0011797929938868693, 6.069134604935027e-08, -5.389046335483464e-12, 2.8207009909973285e-16, -5.86475197560795e-21
+#p as a function of l
+def fl():
+    return c_0+c_1*range_l()+c_2*range_l()**2+c_3*range_l()**3+c_4*range_l()**4+c_5*range_l()**5
+def fl_1():
+    return c_1+2*c_2*range_l()+3*c_3*range_l()**2+4*c_4*range_l()**3+5*c_5*range_l()**4
+def fl_2():
+    return 2*c_2+3*2*c_3*range_l()+4*3*c_4*range_l()**2+5*4*c_5*range_l()**3
+def fl_3():
+    return 3*2*c_3+4*3*2*c_4*range_l()+5*4*3*c_5*range_l()**2
 
-rho1=7.874 #iron density
-
-#obtaining data points for interpolation
-pp=cb1[:,2]*10**-3   #converting MeV/c into GeV/c
-l=cb1[:,10]*10/rho1  #in q/cm^2 to mm
-
-range_l = CubicSpline(pp,l,bc_type='natural') #range as a function of p
-
-fl = CubicSpline(l,pp,bc_type='natural') #cubic spline to get f(l) from p and l
-fl_1=CubicSpline.derivative(fl,nu=1)    #using it to obtain the differential f'(l)
-fl_2=CubicSpline.derivative(fl,nu=2)    #using it to obtain the differential f''(l)
-fl_3=CubicSpline.derivative(fl,nu=3)    #using it to obtain the differential f'''(l)
 
 #***************************************************************
 #Reading measured data
@@ -44,7 +49,8 @@ for i in range(len(df1)):
     mk[i][0]=xm[i]
     mk[i][1]=ym[i]
 Hk=[[1,0,0,0,0],[0,1,0,0,0]]    #projector matrix
-Vk=[[0.1/12,0],[0,0.1/12]]      #measurement error matrix
+#Vk=[[0.1/12,0],[0,0.1/12]]      #measurement error matrix
+Vk=[[0,0],[0,0]]      #measurement error matrix
 Hk=np.array(Hk)
 Vk=np.array(Vk)
 
@@ -61,29 +67,29 @@ by=0
 
 #***************************************************************
 #Initialisation of values
+#E_inc=1.0                       #Initial value of Incident Energy
+#E_inc=5.0                       #Initial value of Incident Energy
+#E_inc=10.0                      #Initial value of Incident Energy
+#E_inc=20.0                      #Initial value of Incident Energy
 E_inc=50.0                       #Initial value of Incident Energy
-#E_inc=100.0                       #Initial value of Incident Energy
-#E_inc=75.0                       #Initial value of Incident Energy
-#z0 = zm[0]  
-#z1 = zm[1]
+#E_inc=100.0                     #Initial value of Incident Energy
+
 
 stv = [[ None for i in range(5) ] for j in range(len(df1)) ] #state vector
 stv = np.array(stv)
 
 #Defining the initial state vector from measured
-stv[0][0]=df1[0,4]
-stv[0][1]=df1[0,6]
-stv[1][0]=df1[1,4]
-stv[1][1]=df1[1,6]
-stv[0][2]=(stv[1][0]-stv[0][0])/(zm[1]-zm[0]) #tx_0 =(x1-x0)/(z1-z0)
-stv[0][3]=(stv[1][1]-stv[0][1])/(zm[1]-zm[0]) #ty_0 =(y1-y0)/(z1-z0)
-stv[0][4]=0.0#q/np.sqrt(E_inc**2-m**2)           #Initial value of Momentum in GeV/c
+stv[0][0]= df1[0,4]
+stv[0][1]= df1[0,6]
+stv[0][2]= (df1[1,4]-df1[0,4])/(zm[1]-zm[0]) #tx_0 =(x1-x0)/(z1-z0)
+stv[0][3]= (df1[1,6]-df1[0,6])/(zm[1]-zm[0]) #ty_0 =(y1-y0)/(z1-z0)
+stv[0][4]= 10**-7 #0.0            #Initial value of Momentum in GeV/c
 
 #***************************************************************
 #Defining the Prediction equations
 
-x,y,tx,ty,qbp,dz,p=sym.symbols('x y tx ty qbp dz p') #symbols in prediction
-#p=q/qbp
+x,y,tx,ty,qbp,dz=sym.symbols('x y tx ty qbp dz') #symbols in prediction
+
 
 def sx():
     return(0.5*bx*dz**2)
@@ -134,74 +140,72 @@ def x_d():
 def T():
     return 2*me*(beta()*gamma())**2/( 1 + 2*(me/m)*sym.sqrt(1+(beta()*gamma())**2+(me/m)**2) ) # Max Kinetic Eenrgy   
      
-
-f_b = sym.lambdify((qbp), beta(), "numpy")     
+f_g  = sym.lambdify((qbp), gamma(), "numpy")     
+f_b  = sym.lambdify((qbp), beta(), "numpy")     
 f_xd = sym.lambdify((qbp), x_d(), "numpy")
-f_T = sym.lambdify((qbp), T(), "numpy")
+f_T  = sym.lambdify((qbp), T(), "numpy")
 
-def BetheBlochIron():
-     rho=7.874
-     ZbA=26.0/55.845 #Z/A
-     I=286*10**-9 #in GeV
-              
-     dEds= rho*0.307075/((beta())**2)*ZbA*( 0.5*sym.log(2*me*(beta()*gamma())**2*T()/(I**2))-(beta())**2)#-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g
-     return dEds
 
-def FermiIron(i,qbpe): #Fermi correction to Bethe Bloche 
-     
-     rho=7.874
-     ZbA=26.0/55.845 
-     #constants for Fermi correction in Iron
-     xd0=-0.0012
-     xd1=3.15
-     md=2.96
-     a=0.1468
-     C0=-4.29
-     xd=f_xd(qbpe)
-     if xd<xd0:
+def EnergylossIron(qbpe):
+    global q
+    rho=7.874
+    ZbA=26.0/55.845 #Z/A
+    I=286*10**-9 #in GeV
+    xd0=-0.0012
+    xd1=3.15
+    md=2.96
+    a=0.1468
+    C0=-4.29
+    if qbpe<0:
+        qbpe=-qbpe
+        #q=-0.303
+    #if qbpe>0:
+     #   q=0.303
+     #print(qbpe,f_b(qbpe),f_g(qbpe),f_xd(qbpe))
+    xd=f_xd(qbpe)
+    if xd<xd0:
             delta=0.0
-     if xd>xd0 and xd<xd1:
+    if xd>xd0 and xd<xd1:
             delta=4.6052*xd+C0+(a*((xd1-xd)**md))
-     if xd>xd1:
+    if xd>xd1:
             delta=4.6052*xd+C0
      
-     return rho*0.307075/((f_b(qbpe))**2)*ZbA*delta**0.5
-     
-def EnergylossIron(i,qbpe):
-    En=f_betheI(qbpe)-FermiIron(i,qbpe)
-    return En
 
-def BetheBlochAir():
-     rho=1.205*10**-3
-     ZbA=0.49919   #Z/A
-     I=85.7*10**-9 #in GeV  
+    dEds= rho*0.307075/((f_b(qbpe))**2)*ZbA*( 0.5*np.log(2*me*(f_b(qbpe)*f_g(qbpe))**2*f_T(qbpe)/(I**2))-(f_b(qbpe)**2)-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g        
+    return dEds
+
+     
+
+
+def EnergylossAir(qbpe):
+    global q
+    rho=1.205*10**-3
+    ZbA=0.49919   #Z/A
+    I=85.7*10**-9 #in GeV  
+    xd0=1.742
+    xd1=4.28
+    md=3.40
+    a=0.1091
+    C0=-10.6
+    if qbpe<0:
+        qbpe=-qbpe
+        #q=-0.303
+    #if qbpe>0:
+        #q=0.303
+    #print(qbpe,f_b(qbpe),f_g(qbpe),f_xd(qbpe))
+    xd=f_xd(qbpe)
+    if xd<xd0:
+        delta=0.0
+    if xd>xd0 and xd<xd1:
+        delta=4.6052*xd+C0+(a*((xd1-xd)**md))
+    if xd>xd1:
+        delta=4.6052*xd+C0
+     
+    dEds= rho*0.307075/((f_b(qbpe))**2)*ZbA*( 0.5*np.log(2*me*(f_b(qbpe)*f_g(qbpe))**2*f_T(qbpe)/(I**2))-(f_b(qbpe)**2)-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g        
               
-     dEds= rho*0.307075/((beta())**2)*ZbA*( 0.5*sym.log(2*me*(beta()*gamma())**2*T()/(I**2))-(beta())**2)#-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g
-     return dEds
+#     dEds= rho*0.307075/((beta())**2)*ZbA*( 0.5*sym.log(2*me*(beta()*gamma())**2*T()/(I**2))-(beta())**2)#-delta*0.5) #Bethe Bloch Formula in MeVcm**2/g
+    return dEds
 
-def FermiAir(i,qbpe): #Fermi correction to Bethe Bloche 
-     rho=1.205*10**-3
-     ZbA=0.49919
-    #constants for Fermi correction in Air
-     xd0=1.742
-     xd1=4.28
-     md=3.40
-     a=0.1091
-     C0=-10.6
-
-     xd=f_xd(qbpe)
-     if xd<xd0:
-            delta=0.0
-     if xd>xd0 and xd<xd1:
-            delta=4.6052*xd+C0+(a*((xd1-xd)**md))
-     if xd>xd1:
-            delta=4.6052*xd+C0
-     
-     return rho*0.307075/((f_b(qbpe))**2)*ZbA*delta**0.5
-
-def EnergylossAir(i,qbpe):
-    En=f_betheA(qbpe)-FermiAir(i,qbpe)
-    return En
 
 #Converting symbolic to mathematical
 
@@ -209,8 +213,6 @@ f_x = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_xe(), "numpy")
 f_y = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_ye(), "numpy")
 f_tx= sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_txe(),"numpy")
 f_ty= sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_tye(),"numpy")
-f_betheI=sym.lambdify((qbp), BetheBlochIron(),"numpy")
-f_betheA=sym.lambdify((qbp), BetheBlochAir(),"numpy")
 
 #***************************************************************
 
@@ -261,16 +263,22 @@ def Prediction_typrimeqbp():
     return Prediction_tye().diff(qbp)
 
 
-def Prediction_qbpprimeqbp(pe,dl):
-    return 1+((fl_2(range_l(pe))/fl_1(range_l(pe))*dl)+0.5*fl_3(range_l(pe))/fl_1(range_l(pe))*dl**2)
-def Prediction_qbpprimex(pe,dl):
-    return K*(fl_1(range_l(pe))+fl_2(range_l(pe))*dl)*fl(range_l(pe))*sym.sqrt(1+tx**2+ty**2)*dl*(-by)
-def Prediction_qbpprimey(pe,dl):
-    return K*(fl_1(range_l(pe))+fl_2(range_l(pe))*dl)*fl(range_l(pe))*sym.sqrt(1+tx**2+ty**2)*dl*(bx)
-def Prediction_qbpprimetx(pe,dl):
-    return (fl_1(range_l(pe))+fl_2(range_l(pe))*dl)*dz*(tx/sym.sqrt(1+tx**2+ty**2))
-def Prediction_qbpprimety(pe,dl):
-    return  (fl_1(range_l(pe))+fl_2(range_l(pe))*dl)*dz*(ty/sym.sqrt(1+tx**2+ty**2))
+
+def Prediction_qbpprimeqbp():
+    dl =dz*sym.sqrt(1+tx**2+ty**2)
+    return 1+ (fl_2())/fl_1()*dl + 0.5*fl_3()/fl_1()*dl**2
+def Prediction_qbpprimex():
+    dl =dz*sym.sqrt(1+tx**2+ty**2)
+    return K*(fl_1()+fl_2()*dl)*fl()*sym.sqrt(1+tx**2+ty**2)*dl*(-by)
+def Prediction_qbpprimey():
+    dl =dz*sym.sqrt(1+tx**2+ty**2)
+    return K*(fl_1()+fl_2()*dl)*fl()*sym.sqrt(1+tx**2+ty**2)*dl*(bx)
+def Prediction_qbpprimetx():
+    dl =dz*sym.sqrt(1+tx**2+ty**2)
+    return (fl_1()+fl_2()*dl)*dz*(tx/sym.sqrt(1+tx**2+ty**2))
+def Prediction_qbpprimety():
+    dl =dz*sym.sqrt(1+tx**2+ty**2)
+    return  (fl_1()+fl_2()*dl)*dz*(ty/sym.sqrt(1+tx**2+ty**2))
 
 
 #Converting symbolic to mathematical
@@ -296,19 +304,20 @@ f_typrimetx = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_typrimetx(),"numpy")
 f_typrimety = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_typrimety(),"numpy")
 f_typrimeqbp= sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_typrimeqbp(), "numpy")    
 
+f_qbpprimex = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimex(), "numpy")    
+f_qbpprimey = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimey(), "numpy")    
+f_qbpprimetx = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimetx(), "numpy")    
+f_qbpprimety = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimety(), "numpy")    
+f_qbpprimeqbp = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimeqbp(), "numpy")    
+    
+
 
 
 #Propagator matrix calculation
 prop_f =[[None for j in range (5)] for i in range (5)]
 prop_f=np.array(prop_f,dtype=float)
 
-def Propagator(xe,ye,txe,tye,qbpe,dze,dle):
-    
-    f_qbpprimex = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimex(q/qbpe,dle), "numpy")    
-    f_qbpprimey = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimey(q/qbpe,dle), "numpy")    
-    f_qbpprimetx = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimetx(q/qbpe,dle), "numpy")    
-    f_qbpprimety = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimety(q/qbpe,dle), "numpy")    
-    f_qbpprimeqbp = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_qbpprimeqbp(q/qbpe,dle), "numpy")    
+def Propagator(xe,ye,txe,tye,qbpe,dze):
     
     global prop_f    
     
@@ -348,6 +357,7 @@ def CMS_I():                           #Highland-Lynch-Dahl variance formula
     dl=dz*sym.sqrt(1+tx**2+ty**2)
     Z=26.0
     ls=17.57*((Z+1)/Z)*(289*Z**(-1/2))/(159*Z**(-1/3))
+    p=q/qbp
     return (0.015/(beta()*p))**2*(dl/ls)
 
 def cov_txtx():                 
@@ -358,23 +368,27 @@ def cov_txty():
     return tx*ty*(1+tx**2+ty**2)*CMS_I()
 
 
-c_txtx = sym.lambdify((tx,ty,qbp,dz,p), cov_txtx(), "numpy")    
-c_tyty = sym.lambdify((tx,ty,qbp,dz,p), cov_tyty(), "numpy")    
-c_txty = sym.lambdify((tx,ty,qbp,dz,p), cov_txty(), "numpy")    
+c_txtx = sym.lambdify((tx,ty,qbp,dz), cov_txtx(), "numpy")    
+c_tyty = sym.lambdify((tx,ty,qbp,dz), cov_tyty(), "numpy")    
+c_txty = sym.lambdify((tx,ty,qbp,dz), cov_txty(), "numpy")    
 
 def Prediction_xprimep():  
+    p=q/qbp
     return ((-K*q/p**2*(1+ (tx)**2 +(ty)**2)**0.5)*(tx*ty*sx()-(1+tx**2)*sy()) + -2*(K*q*(1+ (tx)**2 +(ty)**2)**0.5)**2/(p**3)*(tx*(3*ty**2 +1)*sxx() -ty*(3*tx**2 +1)*sxy() -ty*(3*tx**2 +1)*syx() +tx*(3*tx**2 +3)*syy()))
 def Prediction_yprimep():
+    p=q/qbp
     return((-K*q/p**2*(1+ (tx)**2 +(ty)**2)**0.5)*((1+ty**2)*sx() -tx*ty*sy()) + -2*(K*q*(1+ (tx)**2 +(ty)**2)**0.5)**2/(p**3)*(ty*(3*ty**2 +3)*sxx() -tx*(3*ty**2 +1)*sxy() -tx*(3*ty**2 +1)*syx() +ty*(3*tx**2 +1)*syy()))
 def Prediction_txprimep():
+    p=q/qbp
     return((-K*q/p**2*(1+ (tx)**2 +(ty)**2)**0.5)*(tx*ty*rx()-(1+tx**2)*ry()) + -2*(K*q*(1+ (tx)**2 +(ty)**2)**0.5)**2/(p**3)*(tx*(3*ty**2 +1)*rxx() -ty*(3*tx**2 +1)*rxy() -ty*(3*tx**2 +1)*ryx() +tx*(3*tx**2 +3)*ryy()))
 def Prediction_typrimep():
+    p=q/qbp
     return((-K*q/p**2*(1+ (tx)**2 +(ty)**2)**0.5)*((1+ty**2)*rx() -tx*ty*ry()) + -2*(K*q*(1+ (tx)**2 +(ty)**2)**0.5)**2/(p**3)*(ty*(3*(ty**2) +3)*rxx() -tx*(3*ty**2 +1)*rxy() -tx*(3*ty**2 +1)*ryx() +ty*(3*tx**2 +1)*ryy()))
 
-f_xprimep   = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_xprimep(), "numpy")
-f_yprimep   = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_yprimep(), "numpy")
-f_txprimep   = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_txprimep(), "numpy")
-f_typrimep   = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_typrimep(), "numpy")
+f_xprimep   = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_xprimep(), "numpy")
+f_yprimep   = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_yprimep(), "numpy")
+f_txprimep   = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_txprimep(), "numpy")
+f_typrimep   = sym.lambdify((x,y,tx,ty,qbp,dz), Prediction_typrimep(), "numpy")
 
 
 def xi(qbpe):       #mean energy loss in GeV
@@ -392,36 +406,37 @@ Q_l=np.array(Q_l,dtype=float)
 
 def Scattering(xe,ye,txe,tye,qbpe,dze,l,D):  #Random Error Matrix
     global Q_l
+    
     pe=q/qbpe
    
-    Q_l[0][0]= c_txtx(txe,tye,qbpe,dze,pe)*(l**3)/3
-    Q_l[0][1]= c_txty(txe,tye,qbpe,dze,pe)*(l**3)/3
-    Q_l[0][2]= c_txtx(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[0][3]= c_txty(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[0][4]=-f_xprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[0][0]= c_txtx(txe,tye,qbpe,dze)*(l**3)/3
+    Q_l[0][1]= c_txty(txe,tye,qbpe,dze)*(l**3)/3
+    Q_l[0][2]= c_txtx(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[0][3]= c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[0][4]=-f_xprimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
     
-    Q_l[1][0]=c_txty(txe,tye,qbpe,dze,pe)*(l**3)/3
-    Q_l[1][1]=c_tyty(txe,tye,qbpe,dze,pe)*(l**3)/3
-    Q_l[1][2]=c_txty(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[1][3]=c_tyty(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[1][4]=-f_yprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[1][0]=c_txty(txe,tye,qbpe,dze)*(l**3)/3
+    Q_l[1][1]=c_tyty(txe,tye,qbpe,dze)*(l**3)/3
+    Q_l[1][2]=c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[1][3]=c_tyty(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[1][4]=-f_yprimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
 
-    Q_l[2][0]=c_txtx(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[2][1]=c_txty(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[2][2]=c_txtx(txe,tye,qbpe,dze,pe)*l
-    Q_l[2][3]=c_txty(txe,tye,qbpe,dze,pe)*l
-    Q_l[2][4]=-f_txprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[2][0]=c_txtx(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[2][1]=c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[2][2]=c_txtx(txe,tye,qbpe,dze)*l
+    Q_l[2][3]=c_txty(txe,tye,qbpe,dze)*l
+    Q_l[2][4]=-f_txprimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
     
-    Q_l[3][0]=c_txty(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[3][1]=c_tyty(txe,tye,qbpe,dze,pe)*(l**2)*D/2
-    Q_l[3][2]=c_txtx(txe,tye,qbpe,dze,pe)*l
-    Q_l[3][3]=c_tyty(txe,tye,qbpe,dze,pe)*l
-    Q_l[3][4]=-f_typrimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[3][0]=c_txty(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[3][1]=c_tyty(txe,tye,qbpe,dze)*(l**2)*D/2
+    Q_l[3][2]=c_txtx(txe,tye,qbpe,dze)*l
+    Q_l[3][3]=c_tyty(txe,tye,qbpe,dze)*l
+    Q_l[3][4]=-f_typrimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
 
-    Q_l[4][0]=-f_xprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][1]=-f_yprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][2]=-f_txprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][3]=-f_typrimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[4][0]=-f_xprimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[4][1]=-f_yprimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[4][2]=-f_txprimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    Q_l[4][3]=-f_typrimep(xe,ye,txe,tye,qbpe,dze)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
     Q_l[4][4]=E[-1]**2/(pe**6)*sig2E(qbpe)
 
     Q_l=np.array(Q_l, dtype=float)
@@ -480,7 +495,7 @@ def Plots():
     #X coordinates
 
     #plt.plot(xm,zm)
-    #plt.plot(xpp,zpp) 
+    #plt.plot(xpp,zpp,linestyle='dashed',c='red') 
     #plt.scatter(xm,zm)
     #plt.scatter(xpp,zpp) 
 
@@ -494,7 +509,7 @@ def Plots():
     #Z coordinates
     
     plt.plot(ym,zm)
-    plt.plot(ypp,zpp)   
+    plt.plot(ypp,zpp,linestyle='dashed',c='red')   
     #plt.scatter(ym,zm)
     #plt.scatter(ypp,zpp)
  
@@ -503,23 +518,23 @@ def Plots():
     plt.ylabel('y - values') 
     plt.title('Prediction vs Simulation for z coordinates (20 GeV)') 
     
-    #plt.grid(b=None, which='major', axis='both')
+    plt.grid(b=None, which='major', axis='both')
     plt.show() 
     
 #***************************************************************
 # Main loop starts here
 
+
 E=[]
 E.append(E_inc)                #initial value of energy
 zpp,xpp,ypp=[],[],[]           #data saved for plotting
 ze=zm[0]                       #initial value for z for plotting
+index=4
 
-
-
-for iterations in range(2): # controls the number of iterations; 
+for iterations in range(index): # controls the number of iterations; 
     temp_stv=stv[0]
-    temp_stv=np.array(temp_stv)  
     for i in range(len(df1)):  #Main loop for 150 (air+iron+air) combo
+        
         D=1
         x_e,y_e,tx_e,ty_e,qbp_e=temp_stv
 
@@ -542,15 +557,19 @@ for iterations in range(2): # controls the number of iterations;
         
             
             if (material=="Iron"):
-                dEds=EnergylossIron(i,qbp_e)
+                dEds=EnergylossIron(qbp_e)
             else:
-                dEds=0.0#EnergylossAir(i,qbp_e)          #Assuming no energy loss in air       
+                dEds=EnergylossAir(qbp_e)          #Assuming no energy loss in air       
             
             E_cal = E[-1]-(dEds*dl*10**-4)                #Updating Energy            
             E.append(E_cal)
-            qbp_e = q/np.sqrt(E_cal**2-m**2)              #Updating q/p    
+          
+            if ((E_cal**2-m**2)<0):
+                qbp_e=qbp_e
+            else:
+                qbp_e = q/np.sqrt(E_cal**2-m**2)              #Updating q/p    
             
-            Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)   #Updating propagator matrix
+            Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)   #Updating propagator matrix
             Scattering(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl,D)
 
             Covariance()                                  #Updating the Covariance matrix
@@ -560,18 +579,23 @@ for iterations in range(2): # controls the number of iterations;
     
             #printing the propagator matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'propf \t',prop_f[0][0],prop_f[0][1],prop_f[0][2],prop_f[0][3],prop_f[0][4],'\n','\t',prop_f[1][0],prop_f[1][1],prop_f[1][2],prop_f[1][3],prop_f[1][4],'\n','\t',prop_f[2][0],prop_f[2][1],prop_f[2][2],prop_f[2][3],prop_f[2][4],'\n','\t',prop_f[3][0],prop_f[3][1],prop_f[3][2],prop_f[3][3],prop_f[3][4],'\n','\t',prop_f[4][0],prop_f[4][1],prop_f[4][2],prop_f[4][3],prop_f[4][4],'\n')        
-                    
+
+            #printing the random error matrix for each j   
+            #print('\n________________________________________________________________________________________________________________________________\n',i,j,'frwd \t',Q_l[0][0],Q_l[0][1],Q_l[0][2],Q_l[0][3],Q_l[0][4],'\n','\t',Q_l[1][0],Q_l[1][1],Q_l[1][2],Q_l[1][3],Q_l[1][4],'\n','\t',Q_l[2][0],Q_l[2][1],Q_l[2][2],Q_l[2][3],Q_l[2][4],'\n','\t',Q_l[3][0],Q_l[3][1],Q_l[3][2],Q_l[3][3],Q_l[3][4],'\n','\t',Q_l[4][0],Q_l[4][1],Q_l[4][2],Q_l[4][3],Q_l[4][4],'\n')        
+            
+
             #printing the covariance matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'\t',covp[0][0],covp[0][1],covp[0][2],covp[0][3],covp[0][4],'\n','\t',covp[1][0],covp[1][1],covp[1][2],covp[1][3],covp[1][4],'\n','\t',covp[2][0],covp[2][1],covp[2][2],covp[2][3],covp[2][4],'\n','\t',covp[3][0],covp[3][1],covp[3][2],covp[3][3],covp[3][4],'\n','\t',covp[4][0],covp[4][1],covp[4][2],covp[4][3],covp[4][4],'\n')            
-        temp_stv=Kalman(i,temp_stv) #Kalman filtering 
-        E.append(np.sqrt((q/temp_stv[4])**2+m**2))
         
-        print(i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
+        temp_stv=Kalman(i,temp_stv) #Kalman filtering
+
+        E.append(np.sqrt((q/temp_stv[4])**2+m**2))      #updating the energy with new q/p
+
+        #print(iterations,i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
         
+#For Smooothing    
     for i in reversed(range(len(df1))): #-1, -1, -1)): #Main loop for 150 (air+iron+air) combo forward+backwards
         
-        
-        vector_updation(i,temp_stv,ze)      #saves the state vector
         D=-1
         x_e,y_e,tx_e,ty_e,qbp_e=temp_stv
 
@@ -591,18 +615,20 @@ for iterations in range(2): # controls the number of iterations;
             ty_e = f_ty(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)     #Updating ty
             
             dl =dz_e*np.sqrt(1+tx_e**2+ty_e**2)          #differential arc length
-        
-            
+           
             if (material=="Iron"):
-                dEds=EnergylossIron(i,qbp_e)
+                dEds=EnergylossIron(qbp_e)
             else:
-                dEds=0.0#EnergylossAir(i,qbp_e)          #Assuming no energy loss in air       
+                dEds=EnergylossAir(qbp_e)          #Assuming no energy loss in air       
         
             E_cal = E[-1]-(dEds*dl*10**-4)                #Updating Energy
             E.append(E_cal)
-            qbp_e = q/np.sqrt(E_cal**2-m**2)              #Updating q/p    
+            if ((E_cal**2-m**2)<0):
+                qbp_e=qbp_e
+            else:
+                qbp_e = q/np.sqrt(E_cal**2-m**2)              #Updating q/p    
             
-            Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)   #Updating propagator matrix
+            Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)   #Updating propagator matrix
             Scattering(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl,D)
 
             Covariance()                                  #Updating the Covariance matrix
@@ -612,12 +638,23 @@ for iterations in range(2): # controls the number of iterations;
     
             #printing the propagator matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'propf \t',prop_f[0][0],prop_f[0][1],prop_f[0][2],prop_f[0][3],prop_f[0][4],'\n','\t',prop_f[1][0],prop_f[1][1],prop_f[1][2],prop_f[1][3],prop_f[1][4],'\n','\t',prop_f[2][0],prop_f[2][1],prop_f[2][2],prop_f[2][3],prop_f[2][4],'\n','\t',prop_f[3][0],prop_f[3][1],prop_f[3][2],prop_f[3][3],prop_f[3][4],'\n','\t',prop_f[4][0],prop_f[4][1],prop_f[4][2],prop_f[4][3],prop_f[4][4],'\n')        
+
+            #printing the random error matrix for each j   
+            #print('\n________________________________________________________________________________________________________________________________\n',i,j,'bkwrd \t',Q_l[0][0],Q_l[0][1],Q_l[0][2],Q_l[0][3],Q_l[0][4],'\n','\t',Q_l[1][0],Q_l[1][1],Q_l[1][2],Q_l[1][3],Q_l[1][4],'\n','\t',Q_l[2][0],Q_l[2][1],Q_l[2][2],Q_l[2][3],Q_l[2][4],'\n','\t',Q_l[3][0],Q_l[3][1],Q_l[3][2],Q_l[3][3],Q_l[3][4],'\n','\t',Q_l[4][0],Q_l[4][1],Q_l[4][2],Q_l[4][3],Q_l[4][4],'\n')        
                     
             #printing the covariance matrix for each j   
             #print('\n________________________________________________________________________________________________________________________________\n',i,j,'\t',covp[0][0],covp[0][1],covp[0][2],covp[0][3],covp[0][4],'\n','\t',covp[1][0],covp[1][1],covp[1][2],covp[1][3],covp[1][4],'\n','\t',covp[2][0],covp[2][1],covp[2][2],covp[2][3],covp[2][4],'\n','\t',covp[3][0],covp[3][1],covp[3][2],covp[3][3],covp[3][4],'\n','\t',covp[4][0],covp[4][1],covp[4][2],covp[4][3],covp[4][4],'\n')            
+        
         temp_stv=Kalman(i,temp_stv) #Kalman filtering 
-        E.append(np.sqrt((q/temp_stv[4])**2+m**2))
-        print(i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
+
+        E.append(np.sqrt((q/temp_stv[4])**2+m**2)) #updating the energy with new q/p
+        
+        if iterations==(index-1):               
+            vector_updation(i,temp_stv,ze)      #saves the state vector only at the last iteration
+        
+        #print(iterations,i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
 
 #Plots()
-#plt(,zm)
+end = time.time()
+print('Energy of the muon = \t',E[-1])
+print(f"Runtime of the program is {end - start}")
