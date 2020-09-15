@@ -13,17 +13,16 @@ from scipy.interpolate import CubicSpline
 #import sys
 #sys.stdout = open('output.txt', 'w') #printing output onto output.txt
 
+
 #***************************************************************
 #READING MEASURED DATA
-index=4                         #number of iterations
+index=2                         #number of iterations
 
 #df=pd.read_csv("dataGeV/mp20.txt",sep="\t")
-df=pd.read_csv("dataGeV/mp_twoevent_4.txt",sep="\t") #muon plus ;2 events; 4 GeV
+df=pd.read_csv("dataGeV/mp_twoevent_4.txt",sep="\t") #muon plus ;2 events; 8 GeV
+
 df1=np.array(df)
 
-xm=df1[:,4]
-zm=df1[:,5]
-ym=df1[:,6] #interchange of z to y because by convention of the equation, the z is the perpendicular axis.
 
 eid=df1[:,0]
 n_event=max(eid)
@@ -31,14 +30,11 @@ print("No. of events:",(n_event+1))
 mu_event,sigma_event=[],[]
 
 
-mk =[[ None for i in range(2) ] for j in range(len(df1)) ] #state vector
-mk=np.array(mk)
-for i in range(len(df1)):
-    mk[i][0]=xm[i]
-    mk[i][1]=ym[i]
+
 Hk=[[1,0,0,0,0],[0,1,0,0,0]]    #projector matrix
 #Vk=[[0.1/12,0],[0,0.1/12]]     #measurement error matrix
 Vk=[[0,0],[0,0]]                #measurement error matrix
+#Vk=[[1,0],[0,1]]                #measurement error matrix
 Hk=np.array(Hk)
 Vk=np.array(Vk)
 
@@ -53,28 +49,16 @@ q=0.303                         #1 C in natural units
 bx=1.5                          #magnetic field in tesla
 by=0
 
-#***************************************************************
-#INITIALISATION
+prop_f = [[None for j in range (5)] for i in range (5)]
+prop_f = np.array(prop_f,dtype=float)
+
+Q_l =[[None for j in range (5)] for i in range (5)]
+Q_l=np.array(Q_l,dtype=float)
+
+cov_C =10**6*np.identity(5,  dtype=np.float)                #Initial value for covariance
+cov_C =np.array(cov_C)
 
 
-#E_inc=10.0                      
-#E_inc=20.0                      
-#E_inc=50.0                      
-#E_inc=100.0                     
-E_inc=1000.0                    #Initial value of Incident Energy
-
-
-stv = [[ None for i in range(5) ] for j in range(len(df1)) ] #state vector
-stv = np.array(stv)
-
-#Defining the initial state vector from measured
-stv[0][0]= df1[0,4]
-stv[0][1]= df1[0,6]
-stv[0][2]= (df1[1,4]-df1[0,4])/(zm[1]-zm[0]) #tx_0 =(x1-x0)/(z1-z0)
-stv[0][3]= (df1[1,6]-df1[0,6])/(zm[1]-zm[0]) #ty_0 =(y1-y0)/(z1-z0)
-stv[0][4]= 10**-7#0.0           #Initial value of Momentum in GeV/c
-P_F_lyr=[]
-P_F=[q/stv[0][4]]
 
 
 #***************************************************************
@@ -147,9 +131,6 @@ def EnergylossIron(qbpe):
     C0=-4.29
     if qbpe<0:
         qbpe=-qbpe
-         #q=-0.303
-    #if qbpe>0:
-     #   q=0.303
      #print(qbpe,f_b(qbpe),f_g(qbpe),f_xd(qbpe))
     xd=f_xd(qbpe)
     if xd<xd0:
@@ -174,12 +155,8 @@ def EnergylossAir(qbpe):
     C0=-10.6
     if qbpe<0:
         qbpe=-qbpe
-        #q=-0.303
-    #if qbpe>0:
-        #q=0.303
     #print(qbpe,f_b(qbpe),f_g(qbpe),f_xd(qbpe))
     xd=f_xd(qbpe)
-    #print(i,qbpe,xd,f_b(qbpe),f_g(qbpe))#,xd0)
     if xd<xd0:
         delta=0.0
     if xd>xd0 and xd<xd1:
@@ -282,6 +259,9 @@ cb1=np.array(cb)
 
 pp =cb1[:,3]*10**-3             #converting MeV/c into GeV/c
 l_r=cb1[:,10]*10/7.874          #in q/cm^2 to mm (/iron density)
+ene_r=cb1[:,9]*7.874
+
+#EnergylossIron_C = CubicSpline(pp,ene_r,bc_type='natural')     #Alternate equation for Energy-loss in Iron
 
 range_l = CubicSpline(pp,l_r,bc_type='natural')     #range as a function of p
 
@@ -303,38 +283,35 @@ def fl_3(pe):                 #f'''(l)
 
 
 #Calculation for Propagator Matrix Elements(Row 4)
-def f_qbpprimeqbp(txe,tye,qbpe,dze):
-    dl = dze*np.sqrt(1+txe**2+tye**2)
+def f_qbpprimeqbp(txe,tye,qbpe,dze,dl):
+    
     pe=qbpe
     return 1+ (fl_2(pe))/fl_1(pe)*dl + 0.5*fl_3(pe)/fl_1(pe)*dl**2
 
-def f_qbpprimex(txe,tye,qbpe,dze):
-    dl = dze*np.sqrt(1+txe**2+tye**2)
+def f_qbpprimex(txe,tye,qbpe,dze,dl):
+    
     pe=qbpe
     return K*(fl_1(pe)+fl_2(pe)*dl)*fl(pe)*np.sqrt(1+txe**2+tye**2)*dl*(-by)
 
-def f_qbpprimey(txe,tye,qbpe,dze):
-    dl = dze*np.sqrt(1+txe**2+tye**2)
+def f_qbpprimey(txe,tye,qbpe,dze,dl):
+    
     pe=qbpe
     return K*(fl_1(pe)+fl_2(pe)*dl)*fl(pe)*np.sqrt(1+txe**2+tye**2)*dl*(bx)
 
-def f_qbpprimetx(txe,tye,qbpe,dze):
-    dl = dze*np.sqrt(1+txe**2+tye**2)
+def f_qbpprimetx(txe,tye,qbpe,dze,dl):
+    
     pe=qbpe
     return (fl_1(pe)+fl_2(pe)*dl)*dze*(txe/np.sqrt(1+txe**2+tye**2))
 
-def f_qbpprimety(txe,tye,qbpe,dze):
-    dl = dze*np.sqrt(1+txe**2+tye**2)
+def f_qbpprimety(txe,tye,qbpe,dze,dl):
+    
     pe=qbpe
     return  (fl_1(pe)+fl_2(pe)*dl)*dze*(tye/np.sqrt(1+txe**2+tye**2))
 
 
  
-#Propagator matrix definition
-prop_f = [[None for j in range (5)] for i in range (5)]
-prop_f = np.array(prop_f,dtype=float)
 
-def Propagator(xe,ye,txe,tye,qbpe,dze):
+def Propagator(xe,ye,txe,tye,qbpe,dze,dl):
     
     global prop_f    
     
@@ -362,11 +339,11 @@ def Propagator(xe,ye,txe,tye,qbpe,dze):
     prop_f[3][3] = f_typrimety (txe,tye,qbpe,dze)
     prop_f[3][4] = f_typrimeqbp(txe,tye,qbpe,dze)
 
-    prop_f[4][0] = f_qbpprimex  (txe,tye,qbpe,dze)
-    prop_f[4][1] = f_qbpprimey  (txe,tye,qbpe,dze)
-    prop_f[4][2] = f_qbpprimetx (txe,tye,qbpe,dze)
-    prop_f[4][3] = f_qbpprimety (txe,tye,qbpe,dze)
-    prop_f[4][4] = f_qbpprimeqbp(txe,tye,qbpe,dze)
+    prop_f[4][0] = f_qbpprimex  (txe,tye,qbpe,dze,dl)
+    prop_f[4][1] = f_qbpprimey  (txe,tye,qbpe,dze,dl)
+    prop_f[4][2] = f_qbpprimetx (txe,tye,qbpe,dze,dl)
+    prop_f[4][3] = f_qbpprimety (txe,tye,qbpe,dze,dl)
+    prop_f[4][4] = f_qbpprimeqbp(txe,tye,qbpe,dze,dl)
 
     
     return ()
@@ -374,19 +351,21 @@ def Propagator(xe,ye,txe,tye,qbpe,dze):
 #***************************************************************
 #RANDOM ERROR CALCULATION
 
-def CMS_I(txe,tye,qbpe,dze):    #Highland-Lynch-Dahl variance formula
-    dl = dze*np.sqrt(1+txe**2+tye**2)
-    Z  = 26.0
-    ls = 17.57*((Z+1)/Z)*(289*Z**(-1/2))/(159*Z**(-1/3))  #17.57= radiation length of iron in mm
+def CMS(txe,tye,qbpe,dl):    #Highland-Lynch-Dahl variance formula
+        
+    Z= 26.0
+    l_rad=17.57 #thickness of the medium in mm
+    
+    ls = l_rad*((Z+1)/Z)*(289*Z**(-1/2))/(159*Z**(-1/3))  #17.57= radiation length of iron in mm
     pe = q/qbpe
     return (0.015/(beta(qbpe)*pe))**2*(dl/ls)
 
-def cov_txtx(txe,tye,qbpe,dze):                 
-    return (1+txe**2)*(1+txe**2+tye**2)*CMS_I(txe,tye,qbpe,dze)
-def cov_tyty(txe,tye,qbpe,dze):
-    return (1+tye**2)*(1+txe**2+tye**2)*CMS_I(txe,tye,qbpe,dze)
-def cov_txty(txe,tye,qbpe,dze):
-    return txe*tye*(1+txe**2+tye**2)*CMS_I(txe,tye,qbpe,dze)
+def cov_txtx(txe,tye,qbpe,dl):                 
+    return (1+txe**2)*(1+txe**2+tye**2)*CMS(txe,tye,qbpe,dl)
+def cov_tyty(txe,tye,qbpe,dl):
+    return (1+tye**2)*(1+txe**2+tye**2)*CMS(txe,tye,qbpe,dl)
+def cov_txty(txe,tye,qbpe,dl):
+    return txe*tye*(1+txe**2+tye**2)*CMS(txe,tye,qbpe,dl)
 
 #Calculation for Multiple Scattering Elements in the Random error Matrix
 
@@ -410,15 +389,17 @@ def Prediction_typrimep():
         return(ty + (K*q/p*(1+ (tx)**2 +(ty)**2)**0.5)*((1+ty**2)*rx() -tx*ty*ry()) + (K*q/p*(1+ (tx)**2 +(ty)**2)**0.5)**2*(ty*(3*(ty**2) +3)*rxx() -tx*(3*ty**2 +1)*rxy() -tx*(3*ty**2 +1)*ryx() +ty*(3*tx**2 +1)*ryy()))
     return P_ty().diff(p)
 
-f_xprimep = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_xprimep(),  "numpy")
-f_yprimep = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_yprimep(),  "numpy")
-f_txprimep= sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_txprimep(), "numpy")
-f_typrimep= sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_typrimep(), "numpy")
+
+cov_xqbp = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_xprimep(),  "numpy")
+cov_yqbp = sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_yprimep(),  "numpy")
+cov_txqbp= sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_txprimep(), "numpy")
+cov_tyqbp= sym.lambdify((x,y,tx,ty,qbp,dz,p), Prediction_typrimep(), "numpy")
 
 
 #Calculation for Energy loss Struggling Elements in the Random error Matrix
 
 def xi(qbpe):                                               #Mean energy loss in GeV
+    
     rho = 7.874
     ZbA = 26.0/55.845 
     d = 56                      #thickness of the medium in mm
@@ -429,43 +410,46 @@ def sig2E(qbpe):                                            #var of the Gaussain
 
 
 #Random Error Matrix definition
-Q_l =[[None for j in range (5)] for i in range (5)]
-Q_l=np.array(Q_l,dtype=float)
 
-def RandomError(xe,ye,txe,tye,qbpe,dze,l,D):                #Random Error Matrix
+def RandomError(xe,ye,txe,tye,qbpe,dze,dl,D,material):                #Random Error Matrix
+
+
     global Q_l
-    
+        
     pe=q/qbpe
-   
-    Q_l[0][0]= cov_txtx(txe,tye,qbpe,dze)*(l**3)/3
-    Q_l[0][1]= cov_txty(txe,tye,qbpe,dze)*(l**3)/3
-    Q_l[0][2]= cov_txtx(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[0][3]= cov_txty(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[0][4]=-f_xprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    
-    Q_l[1][0]=cov_txty(txe,tye,qbpe,dze)*(l**3)/3
-    Q_l[1][1]=cov_tyty(txe,tye,qbpe,dze)*(l**3)/3
-    Q_l[1][2]=cov_txty(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[1][3]=cov_tyty(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[1][4]=-f_yprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    if (material=="Air"):
+        Q_l =[[0 for j in range (5)] for i in range (5)]
+    else:
 
-    Q_l[2][0]=cov_txtx(txe,tye,qbpe,dze,)*(l**2)*D/2
-    Q_l[2][1]=cov_txty(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[2][2]=cov_txtx(txe,tye,qbpe,dze)*l
-    Q_l[2][3]=cov_txty(txe,tye,qbpe,dze)*l
-    Q_l[2][4]=-f_txprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+        Q_l[0][0]= cov_txtx(txe,tye,qbpe,dl)*(dl**3)/3
+        Q_l[0][1]= cov_txty(txe,tye,qbpe,dl)*(dl**3)/3
+        Q_l[0][2]= cov_txtx(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[0][3]= cov_txty(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[0][4]=-cov_xqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
     
-    Q_l[3][0]=cov_txty(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[3][1]=cov_tyty(txe,tye,qbpe,dze)*(l**2)*D/2
-    Q_l[3][2]=cov_txtx(txe,tye,qbpe,dze)*l
-    Q_l[3][3]=cov_tyty(txe,tye,qbpe,dze)*l
-    Q_l[3][4]=-f_typrimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+        Q_l[1][0]=cov_txty(txe,tye,qbpe,dl)*(dl**3)/3
+        Q_l[1][1]=cov_tyty(txe,tye,qbpe,dl)*(dl**3)/3
+        Q_l[1][2]=cov_txty(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[1][3]=cov_tyty(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[1][4]=-cov_yqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
 
-    Q_l[4][0]=-f_xprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][1]=-f_yprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][2]=-f_txprimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][3]=-f_typrimep(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
-    Q_l[4][4]=E[-1]**2/(pe**6)*sig2E(qbpe)
+        Q_l[2][0]=cov_txtx(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[2][1]=cov_txty(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[2][2]=cov_txtx(txe,tye,qbpe,dl)*dl
+        Q_l[2][3]=cov_txty(txe,tye,qbpe,dl)*dl
+        Q_l[2][4]=-cov_txqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+    
+        Q_l[3][0]=cov_txty(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[3][1]=cov_tyty(txe,tye,qbpe,dl)*(dl**2)*D/2
+        Q_l[3][2]=cov_txtx(txe,tye,qbpe,dl)*dl
+        Q_l[3][3]=cov_tyty(txe,tye,qbpe,dl)*dl
+        Q_l[3][4]=-cov_tyqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+
+        Q_l[4][0]=-cov_xqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+        Q_l[4][1]=-cov_yqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+        Q_l[4][2]=-cov_txqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+        Q_l[4][3]=-cov_tyqbp(xe,ye,txe,tye,qbpe,dze,pe)*sig2E(qbpe)*q*(E[-1]**2)/(pe**4)
+        Q_l[4][4]=E[-1]**2/(pe**6)*sig2E(qbpe)
 
     Q_l=np.array(Q_l, dtype=float)
 
@@ -473,8 +457,6 @@ def RandomError(xe,ye,txe,tye,qbpe,dze,l,D):                #Random Error Matrix
 #COVARIANCE
 
 #Covariance Matrix definition
-cov_C =10**6*np.identity(5,  dtype=np.float)                #Initial value for covariance
-cov_C =np.array(cov_C)
 
 def Covariance():
 
@@ -561,21 +543,60 @@ for event_index in range(n_event+1):
     eid_ds = df[df['eid']==event_index]
     layer=len(eid_ds)               # no. of the layers per event
     eid_a=np.array(eid_ds)          # array of dataframe pertaining to one particular event
-    print("\n--------------------------------Event No.",event_index,"--------------------------------")
-#    print("No.of layers",layer)
+    print("\n#----------------------------------------Event No.",event_index+1,"----------------------------------------#")
+    xm=eid_a[:,4]
+    zm=eid_a[:,5]
+    ym=eid_a[:,6] #interchange of z to y because by convention of the equation, the z is the perpendicular axis.
+    mk =[[ None for i in range(2) ] for j in range(len(eid_a)) ] #state vector
+    mk=np.array(mk)
+    #print(len(eid_a))
+    for i in range(len(eid_a)):
+        mk[i][0]=xm[i]
+        mk[i][1]=ym[i]
+#plt.plot(mk[:,0],zm)
+    #***************************************************************
+    #INITIALISATION
 
+
+    #E_inc=10.0                      
+    #E_inc=20.0                      
+    #E_inc=50.0                      
+    #E_inc=100.0                     
+    E_inc=1000.0                    #Initial value of Incident Energy
+
+
+    stv = [[ None for i in range(5) ] for j in range(len(eid_a)) ] #state vector
+    stv = np.array(stv)
+    forward_stv=np.array([[ None for i in range(5) ] for j in range(len(eid_a)) ]) #saving the state vector after forward iteration
+    #Defining the initial state vector from measured
+    stv[0][0]= eid_a[0,4]
+    stv[0][1]= eid_a[0,6]
+    stv[0][2]= (eid_a[1,4]-eid_a[0,4])/(zm[1]-zm[0]) #tx_0 =(x1-x0)/(z1-z0)
+    stv[0][3]= (eid_a[1,6]-eid_a[0,6])/(zm[1]-zm[0]) #ty_0 =(y1-y0)/(z1-z0)
+    stv[0][4]= 10**-7#0.0           #Initial value of Momentum in GeV/c
+    P_F=[q/stv[0][4]]
+#    print("No.of layers",layer)
+    P_F_lyr=[]
     E=[]
+    
+    #Propagator matrix definition
+    prop_f = [[None for j in range (5)] for i in range (5)]
+    prop_f = np.array(prop_f,dtype=float)
+
+    Q_l =[[None for j in range (5)] for i in range (5)]
+    Q_l=np.array(Q_l,dtype=float)
+
+    cov_C =10**6*np.identity(5,  dtype=np.float)                #Initial value for covariance
+    cov_C =np.array(cov_C)
+
     E.append(E_inc)                 #saving the initial value of energy
     zpp,xpp,ypp=[],[],[]            #for plotting
-    ze=zm[0]                        #initial value for z ;for plotting
-
-    #count=[]
-    #flag=0.0
-    #count.append(flag)
-
+    
     for iterations in range(index): #controls the number of iterations; 
         temp_stv=stv[0]
-        for i in range(len(df1)):   #Main loop for 150 (air+iron+air) combo
+        ze=zm[0]                        #initial value for z ;for plotting
+
+        for i in range(len(eid_a)):   #Main loop for 150 (air+iron+air) combo
             
             D=1
             x_e,y_e,tx_e,ty_e,qbp_e=temp_stv
@@ -595,33 +616,36 @@ for event_index in range(n_event+1):
                 tx_e = f_tx(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating tx
                 ty_e = f_ty(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating ty
             
-                dl =dz_e*np.sqrt(1+tx_e**2+ty_e**2)             #differential arc length
-
+                dl =dz_e*np.sqrt(1+tx_e**2+ty_e**2)*D             #differential arc length
+                
                 
                 if (material=="Iron"):
                     dEds=EnergylossIron(qbp_e)
+                    #dEds=EnergylossIron_C(q/qbp_e)
                 else:
                     dEds=EnergylossAir(qbp_e)                 
                 
                 E_cal = E[-1]-(dEds*dl*10**-4)                  #Updating Energy 
                 E.append(E_cal)
 
-                #flag=flag+1
-                #count.append(flag)           
-            
-                if ((E_cal**2-m**2)<10**-7):
-                    qbp_e= 0.0303
+                
+                if ((E_cal**2-m**2)<0):#10**-7):
+                    #qbp_e=qbp_e
+                    qbp_e= q/10         #re-initialising as 10 GeV
+                    E.append(np.sqrt((q/temp_stv[4])**2+m**2))
                 else:
                     qbp_e = q/np.sqrt(E_cal**2-m**2)            #Updating q/p    
                 
-                Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)        #Updating propagator matrix
-                RandomError(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl,D)
+                Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)        #Updating propagator matrix
+                RandomError(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl,D,material)
 
                 Covariance()                                    #Updating the Covariance matrix
         
-                ze = ze - dz_e                                  #Updating z
+                #ze = ze - dz_e                                  #Updating z
                 temp_stv=x_e,y_e,tx_e,ty_e,qbp_e    
-        
+                
+                #print(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)
+                
                 #printing the propagator matrix for each j   
                 #print('\n',i,j,'F',prop_f[0][0],prop_f[0][1],prop_f[0][2],prop_f[0][3],prop_f[0][4],'\n','\t',prop_f[1][0],prop_f[1][1],prop_f[1][2],prop_f[1][3],prop_f[1][4],'\n','\t',prop_f[2][0],prop_f[2][1],prop_f[2][2],prop_f[2][3],prop_f[2][4],'\n','\t',prop_f[3][0],prop_f[3][1],prop_f[3][2],prop_f[3][3],prop_f[3][4],'\n','\t',prop_f[4][0],prop_f[4][1],prop_f[4][2],prop_f[4][3],prop_f[4][4],'\n________________________________________________________________________________________________________________________________\n')        
 
@@ -632,60 +656,68 @@ for event_index in range(n_event+1):
                 #print('\n',i,j,'C',cov_C[0][0],cov_C[0][1],cov_C[0][2],cov_C[0][3],cov_C[0][4],'\n','\t',cov_C[1][0],cov_C[1][1],cov_C[1][2],cov_C[1][3],cov_C[1][4],'\n','\t',cov_C[2][0],cov_C[2][1],cov_C[2][2],cov_C[2][3],cov_C[2][4],'\n','\t',cov_C[3][0],cov_C[3][1],cov_C[3][2],cov_C[3][3],cov_C[3][4],'\n','\t',cov_C[4][0],cov_C[4][1],cov_C[4][2],cov_C[4][3],cov_C[4][4],'\n________________________________________________________________________________________________________________________________\n')            
             
                 #print(iterations,i,j,'\t',E[-1])
-            
-            temp_stv=Kalman(i,temp_stv) #Kalman filtering
                 
+                
+            #print(i,E[-1])
+            temp_stv=Kalman(i,temp_stv) #Kalman filtering
+            
             E.append(np.sqrt((q/temp_stv[4])**2+m**2))          #updating the energy with new q/p
+            
+            forward_stv[i][0],forward_stv[i][1],forward_stv[i][2],forward_stv[i][3],forward_stv[i][4]=temp_stv #saving the state vector for smoothing
+            
+            #vector_updation(i,forward_stv,ze)                  #saves the state vector only at the last iteration
+            
             P_F.append(q/temp_stv[4])
-            #flag=flag+1
-            #count.append(flag)   
             
-            print(iterations,i,'\t',E[-1])
+            #print(iterations,i,'\t',E[-1])
             #print(iterations,i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
-            
+        
     #LOOP REPEATED IN REVERSE FOR SMOOTHING
-        for i in reversed(range(len(df1))): #-1, -1, -1)):      #Main loop for 150 (air+iron+air) combo forward+backwards
+        for i in reversed(range(len(eid_a))):       #Main loop for 150 (air+iron+air) combo forward+backwards
             
             D=-1
-            x_e,y_e,tx_e,ty_e,qbp_e=temp_stv
-
+            
+            x_e,y_e,tx_e,ty_e,qbp_e=forward_stv[i]
+            
             for j in range(58):     #Subloop for each combo            
                 
                 if (j==0 or j==57):
-                    dz_e=20*D       #in mm for air gap between rpc and iron      
+                    dz_e=20#*D       #in mm for air gap between rpc and iron      
                     material="Air"
                 else:
-                    dz_e=1*D        #in mm for iron plate
+                    dz_e=1#*D        #in mm for iron plate
                     material="Iron"
                 
-            
-                x_e  = f_x (x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating x
-                y_e  = f_y (x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating y
-                tx_e = f_tx(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating tx
-                ty_e = f_ty(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating ty
+
+                #x_e  = f_x (x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating x
+                #y_e  = f_y (x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating y
+                #tx_e = f_tx(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating tx
+                #ty_e = f_ty(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)       #Updating ty
                 
-                dl =dz_e*np.sqrt(1+tx_e**2+ty_e**2)             #differential arc length
+                dl =dz_e*np.sqrt(1+tx_e**2+ty_e**2)#*D             #differential arc length
             
-                if (material=="Iron"):
-                    dEds=EnergylossIron(qbp_e)
-                else:
+                if (i==0 and j==57):
+                #    dEds=EnergylossIron(qbp_e)
+                    #dEds=EnergylossIron_C(q/qbp_e)
+                #else:
                     dEds=EnergylossAir(qbp_e)          
             
-                E_cal = E[-1]-(dEds*dl*10**-4)                  #Updating Energy
+                    E_cal = E[-1]+(dEds*dl*10**-4)                  #Updating Energy
                 
-                E.append(E_cal)
+                    E.append(E_cal)
 
-                #flag=flag+1
-                #count.append(flag)   
+                    #flag=flag+1
+                    #count.append(flag)   
                 
-                if ((E_cal**2-m**2)<10**-7):
-                    qbp_e= 0.0303
-                else:
+                    #if ((E_cal**2-m**2)<10**-7):
+                    #    qbp_e= (q/10)                 #re-initialising as 10 GeV
+                    #    E.append(np.sqrt((q/temp_stv[4])**2+m**2))
+                    #else:
                     qbp_e = q/np.sqrt(E_cal**2-m**2)            #Updating q/p    
                 
                 
-                Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e)        #Updating propagator matrix
-                RandomError(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl,D)
+                Propagator(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl)        #Updating propagator matrix
+                RandomError(x_e,y_e,tx_e,ty_e,qbp_e,dz_e,dl,D,material)
 
                 Covariance()                                    #Updating the Covariance matrix
         
@@ -701,48 +733,46 @@ for event_index in range(n_event+1):
                 #printing the covariance matrix for each j   
                 #print('\n',i,j,'C',cov_C[0][0],cov_C[0][1],cov_C[0][2],cov_C[0][3],cov_C[0][4],'\n','\t',cov_C[1][0],cov_C[1][1],cov_C[1][2],cov_C[1][3],cov_C[1][4],'\n','\t',cov_C[2][0],cov_C[2][1],cov_C[2][2],cov_C[2][3],cov_C[2][4],'\n','\t',cov_C[3][0],cov_C[3][1],cov_C[3][2],cov_C[3][3],cov_C[3][4],'\n','\t',cov_C[4][0],cov_C[4][1],cov_C[4][2],cov_C[4][3],cov_C[4][4],'\n________________________________________________________________________________________________________________________________\n')            
                 
-                #print(iterations,i,j,'\t',E[-1])
-            
+                #print(i,j,'\t',E[-1])
+                
             temp_stv=Kalman(i,temp_stv)                         #Kalman filtering 
             
             E.append(np.sqrt((q/temp_stv[4])**2+m**2))          #updating the energy with new q/p
             P_F.append(q/temp_stv[4])
-            #flag=flag+1
-            #count.append(flag)   
             
             if iterations==(index-1):               
-                vector_updation(i,temp_stv,ze)                  #saves the state vector only at the last iteration
+                vector_updation(i,temp_stv,ze*D)                  #saves the state vector only at the last iteration
                 P_F_lyr.append(P_F[-1])
             
-            print(iterations,i,'\t',E[-1])
-            #print(iterations,i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
+            #print(((eid_a[i,19]**2+eid_a[i,18]**2+eid_a[i,20]**2)**0.5),P_F[-1])
 
+            #print(iterations,i,'\t',E[-1])
+            #print(iterations,i,temp_stv[0],temp_stv[1],temp_stv[2],temp_stv[3],temp_stv[4],'\t',E[-1])
+        #print('Iteration',iterations+1,' Energy of the muon = \t',E[-1])
     #Plot_x()
     #Plot_z()
+    P_F_lyr=P_F_lyr[::-1]
+    print('Energy of the muon for event',event_index+1,' = \t',E[-1])
 
-    #plt.plot(count,E)
-    #plt.ylim(0,20)
-    #plt.show()
-    print('Energy of the muon = \t',E[-1])
-    diff_p=((eid_a[:,19]**2+eid_a[:,18]**2+eid_a[:,20]**2)**0.5)-np.array(P_F_lyr)/100#0
+    diff_p=((eid_a[:,19]**2+eid_a[:,18]**2+eid_a[:,20]**2)**0.5)-np.array(P_F_lyr)
 #    diff_eve.append(diff_p)
 #    print("diff",diff_p)    
     mu_event.append(np.mean(np.array(diff_p)))      #for single  event
     sigma_event.append(np.std(np.array(diff_p)))    #for single event
+
 mu=np.mean(np.array(mu_event))          # for all events pertaining to a particular energy regime
 sigma=np.std(np.array(sigma_event))     # for all events pertaining to a particular energy regime
 print("mean:",mu)
 print("sigma:",sigma)
-s = np.random.normal(mu, sigma, 10000000)
+s = np.random.normal(mu, sigma, 1000000)#0)
 count, bins, ignored = plt.hist(s, 30000, density=True)
 plt.plot(bins, 1/(sigma * np.sqrt(2 * np.pi)) *np.exp( - (bins - mu)**2 / (2 * sigma**2) ),linewidth=2, color='b')
 # x=((eid_a[:,19]**2+eid_a[:,18]**2+eid_a[:,20]**2)**0.5)
 # plt.plot(x,y)
 # plt.hist(y)
-plt.xlabel("$P_{true}$- $P_{Kalman}$")
+plt.xlabel("$P_{true}$- $P_{Kalman}$ GeV")
 plt.ylabel("Frequency")
 plt.show()
-
 
 end = time.time()
 print(f"Runtime of the program is {end - start}")
