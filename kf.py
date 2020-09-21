@@ -18,8 +18,8 @@ number_of_iterations=4                         #number of iterations for filteri
 
 #READING MEASURED DATA
 
-#df=pd.read_csv("dataGeV/mu+10Gev10eve.txt",sep="\t") #muon+ ;10 events ;10 GeV
-df=pd.read_csv("dataGeV/mu+5GeV100eve.txt",sep="\t")  #muon+ ;100 events; 5 GeV
+df=pd.read_csv("dataGeV/mu+10Gev10eve.txt",sep="\t") #muon+ ;10 events ;10 GeV
+#df=pd.read_csv("dataGeV/mu+5GeV100eve.txt",sep="\t")  #muon+ ;100 events; 5 GeV
 
 df1=np.array(df)
 
@@ -342,9 +342,9 @@ def Propagator(x_e,y_e,tx_e,ty_e,qp_e,dz_e,dl,b_x):
 def CMS(qp_e,dl):    #Highland-Lynch-Dahl variance formula
         
     Z= 26.0
-    l_rad=17.57 #radiation length for iron
+    l_rad=17.57 #radiation length for iron im mm
     
-    ls = l_rad*((Z+1)/Z)*(287*Z**(-1/2))/(159*Z**(-1/3))  #17.57= radiation length of iron in mm
+    ls = l_rad*((Z+1)/Z)*(287*Z**(-1/2))/(159*Z**(-1/3))  
     pe = q/qp_e
     return (0.015/(beta(qp_e)*pe))**2*(dl/ls)
 
@@ -395,9 +395,11 @@ def xi(qp_e):                                               #Mean energy loss in
 
 def sig2E(qp_e):                                            #var of the Gaussain distribution in GeV^2
     return  xi(qp_e)*Tmax(qp_e)*10**-3*(1-(beta(qp_e)**2)/2)
-    #return 13.88**2
+
+
 def k_para(qp_e):
     return xi(qp_e)/Tmax(qp_e)
+
 #Random Error Matrix definition
 
 def RandomError(x_e,y_e,tx_e,ty_e,qp_e,dz_e,dl,D,material):                #Random Error Matrix
@@ -528,7 +530,7 @@ def Plot_z(event_index):
 #***************************************************************
 #MAIN LOOP STARTS HERE
 
-for event_index in range(80):#number_of_events+1):
+for event_index in range(number_of_events+1):
     
     eid_ = df[df['eid']==event_index]
     
