@@ -18,7 +18,7 @@ from scipy.interpolate import CubicSpline       #fitting
 #import sys
 #sys.stdout = open('output_results.txt', 'w')   #printing output onto a txt file
 
-#TrueEnergy=10
+TrueEnergy=10
 
 m=0.105658                      #muon mass in GeV/c^2
 m_e=0.511*10**-3                #electron mass in GeV/c^2
@@ -611,11 +611,11 @@ for event_index in range(num_of_events+1):
         
         Pulldist.append(pull_qp)
         
-        #if event_index==0:
-            #est=time.time()
-            #est_time=(num_of_events+1)*(est - est_start)/60
-            #est_time=int(est_time)
-            #print("Estimated runtime of the program is ~ {} mins\n".format(est_time))
+        if event_index==0:
+            est=time.time()
+            est_time=(num_of_events+1)*(est - est_start)/60
+            est_time=int(est_time)
+            print("Estimated runtime of the program is ~ {} mins\n".format(est_time))
         
         #P_F_lyr = P_F_lyr[::-1]       #since appending was done in reverse
         #diff_p = ( (eid.data_per_eid[:,19]**2+eid.data_per_eid[:,18]**2+eid.data_per_eid[:,20]**2)**0.5 )- np.array(P_F_lyr) #difference in momentum per layer in GeV
@@ -638,7 +638,7 @@ print("Mean of pull distribution of momentum:","{:.4f}".format(mean))
 sigma=np.std(np.array(Pulldist))     
 print("Sigma:","{:.4f}".format(sigma))    
 count, bins, p_=plt.hist(Pulldist,bins=50,density=True)
-plt.plot(bins, max_bin_height*1/(sigma * np.sqrt(2 * np.pi)) *np.exp( - (bins - mean)**2 / (2 * sigma**2) ),linewidth=2, color='black') #gaussian curve plot
+
 plt.title("Pull of q/P for %i GeV" %TrueEnergy)
 plt.xlabel("$(q/P_{true}$- $q/P_{Kalman})$/ \u03C3(q/P)")
 
@@ -660,6 +660,7 @@ for item in p_:
     if max_bin_height<item.get_height():
         max_bin_height=item.get_height()
 
+plt.plot(bins, max_bin_height*1/(sigma * np.sqrt(2 * np.pi)) *np.exp( - (bins - mean)**2 / (2 * sigma**2) ),linewidth=2, color='black') #gaussian curve plot
 
 plt.axvline(x=mean,linestyle='dashed',color='black')
 plt.axvline(x=mean+sigma,linestyle='dotted',color='black')
