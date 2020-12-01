@@ -18,7 +18,7 @@ from scipy.interpolate import CubicSpline       #fitting
 #import sys
 #sys.stdout = open('output_results.txt', 'w')   #printing output onto a txt file
 
-TrueEnergy=10
+TrueEnergy=1
 
 m=0.105658                      #muon mass in GeV/c^2
 m_e=0.511*10**-3                #electron mass in GeV/c^2
@@ -533,12 +533,11 @@ class Kalman_Filter:
 
 
 #filename="dataGeV/"+str(TrueEnergy)+"GeVmu+100eve.txt"
-
 filename="dataGeV/10GeVmu+100eve.txt"
 
 issue=[]
-#residual_dist,mean_per_event,sigma_per_event=[],[],[] #for residual distribution plots
-Pulldist=[] #for pull plots
+residual_dist,mean_per_event,sigma_per_event=[],[],[] #for residual distribution plots
+#Pulldist=[] #for pull plots
 
 #print("\n\nTrue Energy of the muon:",TrueEnergy," GeV")
 
@@ -557,11 +556,11 @@ obj.Prediction_expressions()
 est_start=time.time()        
 for event_index in range(num_of_events+1):
     try:
-        #print("\n\n------------------------------------Event No.",event_index+1,"------------------------------------")    
+        print("\n\n------------------------------------Event No.",event_index+1,"------------------------------------")    
         
         eid = Datahandling(df,event_index)
 
-        #print('\nNo.of layers:',eid.num_of_layers,'\n')
+        print('\nNo.of layers:',eid.num_of_layers,'\n')
         
         prior_sv, Cov_matrix = eid.Initialisation()
         
@@ -571,6 +570,7 @@ for event_index in range(num_of_events+1):
             
             D=1
             for i in range(1,len(eid.data_per_eid)):   #Forward loop for 150 (air+iron+air) combo                
+                
                 for j in range(58):                  #[ air('0') + iron('1'-'56') + air('57') ]            
                     obj2 = Prior_Predictions(j, D, prior_sv, Cov_matrix) 
                     prior_sv, Cov_matrix, Prop_matrix = obj2.f_predictions()
@@ -584,6 +584,7 @@ for event_index in range(num_of_events+1):
             
             D=-1
             for i in reversed(range(len(eid.data_per_eid)-1)):   #Reverse loop for 150 (air+iron+air) combo
+                
                 for j in reversed(range(58)):           #[ air('57') + iron('56'-'1') + air('0')]
                     obj2 = Prior_Predictions(j, D, prior_sv, Cov_matrix) 
                     prior_sv, Cov_matrix, Prop_matrix = obj2.f_predictions()
@@ -599,17 +600,17 @@ for event_index in range(num_of_events+1):
         
         #print('\nEnergy of the muon for event',event_index+1,' = ',np.sqrt((q/post_sv[4])**2+m**2))
         
-        eid.true_sv[4]=q/np.sqrt(TrueEnergy**2-m**2)
+        #eid.true_sv[4]=q/np.sqrt(TrueEnergy**2-m**2)
         
-        pull_value = eid.true_sv-post_sv
+        #pull_value = eid.true_sv-post_sv
         
-        pull_x  = pull_value[0]/np.sqrt(Cov_matrix[0][0])
-        pull_y  = pull_value[1]/np.sqrt(Cov_matrix[1][1])
-        pull_tx = pull_value[2]/np.sqrt(Cov_matrix[2][2])
-        pull_ty = pull_value[3]/np.sqrt(Cov_matrix[3][3])
-        pull_qp = pull_value[4]/np.sqrt(Cov_matrix[4][4])
+        #pull_x  = pull_value[0]/np.sqrt(Cov_matrix[0][0])
+        #pull_y  = pull_value[1]/np.sqrt(Cov_matrix[1][1])
+        #pull_tx = pull_value[2]/np.sqrt(Cov_matrix[2][2])
+        #pull_ty = pull_value[3]/np.sqrt(Cov_matrix[3][3])
+        #pull_qp = pull_value[4]/np.sqrt(Cov_matrix[4][4])
         
-        Pulldist.append(pull_qp)
+        #Pulldist.append(pull_qp)
         
         if event_index==0:
             est=time.time()
@@ -617,13 +618,13 @@ for event_index in range(num_of_events+1):
             est_time=int(est_time)
             print("Estimated runtime of the program is ~ {} mins\n".format(est_time))
         
-        #P_F_lyr = P_F_lyr[::-1]       #since appending was done in reverse
-        #diff_p = ( (eid.data_per_eid[:,19]**2+eid.data_per_eid[:,18]**2+eid.data_per_eid[:,20]**2)**0.5 )- np.array(P_F_lyr) #difference in momentum per layer in GeV
-        #for i in range(len(eid.data_per_eid)):   
-        #    residual_dist.append(diff_p[i])
+        P_F_lyr = P_F_lyr[::-1]       #since appending was done in reverse
+        diff_p = ( (eid.data_per_eid[:,19]**2+eid.data_per_eid[:,18]**2+eid.data_per_eid[:,20]**2)**0.5 )- np.array(P_F_lyr) #difference in momentum per layer in GeV
+        for i in range(len(eid.data_per_eid)):   
+            residual_dist.append(diff_p[i])
         
-        #mean_per_event.append(np.mean(np.array(diff_p)))      
-        #sigma_per_event.append(np.std(np.array(diff_p)))      
+        mean_per_event.append(np.mean(np.array(diff_p)))      
+        sigma_per_event.append(np.std(np.array(diff_p)))      
     
     except:
         issue.append(event_index)       #failed events
@@ -631,43 +632,45 @@ for event_index in range(num_of_events+1):
 print("\n\n------------------------------------------------------------------------------------")
 print("------------------------------------------------------------------------------------")
 
-#Pull plots
-plt.style.use('ggplot')
-mean=np.mean(np.array(Pulldist))      
-print("Mean of pull distribution of momentum:","{:.4f}".format(mean))
-sigma=np.std(np.array(Pulldist))     
-print("Sigma:","{:.4f}".format(sigma))    
-count, bins, p_=plt.hist(Pulldist,bins=50,density=True)
 
-plt.title("Pull of q/P for %i GeV" %TrueEnergy)
-plt.xlabel("$(q/P_{true}$- $q/P_{Kalman})$/ \u03C3(q/P)")
+plt.style.use('ggplot')
+
+#Pull plots
+#mean_=np.mean(np.array(Pulldist))      
+#print("Mean of pull distribution of momentum:","{:.4f}".format(mean_))
+#sigma=np.std(np.array(Pulldist))     
+#print("Sigma:","{:.4f}".format(sigma))    
+#count, bins, p_=plt.hist(Pulldist,bins=50,density=True)
+
+#plt.title("Pull of q/P for %i GeV" %TrueEnergy)
+#plt.xlabel("$(q/P_{true}$- $q/P_{Kalman})$/ \u03C3(q/P)")
 
 
 
 #Residual plot
-
-#mean_=np.mean(np.array(mean_per_event))          # for all events pertaining to a particular energy regime
-#print("Mean of the Residual distribution of momentum:","{:.4f}".format(mean))
-#sigma=np.std(np.array(sigma_per_event))          # for all events pertaining to a particular energy regime
-#print("Sigma:","{:.4f}".format(sigma))
-#residual_dist=np.array(residual_dist)
-#count, bins, p_=plt.hist(residual_dist,bins=3000,density=True)
-#plt.title("Residual distribution of P for %i GeV" %TrueEnergy)
-#plt.xlabel("$P_{true}$- $P_{Kalman}$ (GeV/c)")
+mean_=np.mean(np.array(mean_per_event))          # for all events pertaining to a particular energy regime
+print("Mean of the Residual distribution of momentum:","{:.4f}".format(mean_))
+sigma=np.std(np.array(sigma_per_event))          # for all events pertaining to a particular energy regime
+print("Sigma:","{:.4f}".format(sigma))
+residual_dist=np.array(residual_dist)
+count, bins, p_=plt.hist(residual_dist,bins=3000,density=True)
+plt.title("Residual distribution of P for %i GeV" %TrueEnergy)
+plt.xlabel("$P_{true}$- $P_{Kalman}$ (GeV/c)")
 
 max_bin_height=0
 for item in p_:
     if max_bin_height<item.get_height():
         max_bin_height=item.get_height()
 
-plt.plot(bins, max_bin_height*1/(sigma * np.sqrt(2 * np.pi)) *np.exp( - (bins - mean)**2 / (2 * sigma**2) ),linewidth=2, color='black') #gaussian curve plot
 
-plt.axvline(x=mean,linestyle='dashed',color='black')
-plt.axvline(x=mean+sigma,linestyle='dotted',color='black')
-plt.axvline(x=mean-sigma,linestyle='dotted',color='black')
+#plt.plot(bins, max_bin_height*1/(sigma * np.sqrt(2 * np.pi)) *np.exp( - (bins - mean)**2 / (2 * sigma**2) ),linewidth=2, color='black') #gaussian curve plot
+
+plt.axvline(x=mean_,linestyle='dashed',color='black')
+plt.axvline(x=mean_+sigma,linestyle='dotted',color='black')
+plt.axvline(x=mean_-sigma,linestyle='dotted',color='black')
 
 plt.ylabel("Frequency")
-plt.xlim((mean-3*sigma),(mean+3*sigma))
+plt.xlim((mean_-3*sigma),(mean_+3*sigma))
 #plt.xlim(-2,8)
 plt.ylim(0,1.1*max_bin_height)
 
