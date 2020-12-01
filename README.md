@@ -21,7 +21,7 @@ Extrapolation formulae for tracing the track of a charged partiicle passing thro
 The code is modularised in 6 classes,
 
 ### Data Handling
-The input file is read, the number of events is set and the number of iterations of the loop is also set in this snippet. The measured data includes the positional coordinates of the RPC hit of the particle. These are then stored in an array $M_k$ to be used in the Kalman Filter module.
+The measured data is obtained and stored for each event in an array **M_k** which are to be used in the Kalman Filter algorithm. The measured data contains the positional coordinates of the RPC hit of the particle. Function 'Initialisation'  is used to initialise the values of covariances and state vector at the vertex for each event.
 
 ### Symbolic_Expressions
 Symbolic functions which are used for the prediction equations and the error calculation are all mentioned within this class. These functions are then invoked in the beginning of main and lambdified to mathematical functions to save computational time.
